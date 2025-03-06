@@ -1,0 +1,88 @@
+import serial.tools.list_ports
+import time
+import pygame
+
+
+# List all available serial ports
+ports = serial.tools.list_ports.comports()
+
+print("Available COM Ports:")
+for port in ports:
+    print(port.device, "-", port.description)
+
+
+# testing the connection of the bluetooth
+bluetooth_port = "COM5"
+baud_rate = 9600
+
+try:
+    arduino = serial.Serial(bluetooth_port, baud_rate)
+    time.sleep(2)  # Wait for connection to establish
+    print(f"✅ Connected to {bluetooth_port} successfully!")
+except Exception as e:
+    print(f"❌ Failed to connect: {e}")
+
+
+# Initialize pygame for joystick input
+pygame.init()
+
+# Check if a joystick is connected
+if pygame.joystick.get_count() == 0:
+    print("❌ No joystick detected! Connect the PS3 controller and try again.")
+    exit()
+
+# Initialize pygame
+pygame.init()
+
+# Get the number of connected joysticks
+joystick_count = pygame.joystick.get_count()
+
+if joystick_count == 0:
+    print("❌ No joystick detected! Connect the PS3 controller and try again.")
+else:
+    print(f"✅ {joystick_count} joystick(s) detected.")
+
+
+# Initialize the first joystick
+joystick = pygame.joystick.Joystick(0)
+joystick.init()
+
+# Print joystick name
+print(f"✅ Connected to: {joystick.get_name()}")
+
+
+# reading inputs
+while True:
+    pygame.event.pump()  # Refresh joystick events
+
+    # Read R2 and L2 triggers
+    r2 = joystick.get_axis(5)  # R2 trigger (-1 to 1)
+    l2 = joystick.get_axis(4)  # L2 trigger (-1 to 1)
+    x_axis = joystick.get_axis(0)  # Left joystick X-axis (-1 to 1)
+
+    # Debugging: Print raw values of joystick
+    print(f"🎮 Raw R2: {r2:.2f}, L2: {l2:.2f}, X-axis: {x_axis:.2f}")
+
+    # Normalize values for Arduino (0 to 255)
+    accel_value = int((r2 + 1) * 127)  # Scale from 0 to 255
+    brake_value = int((l2 + 1) * 127)  # Scale from 0 to 255
+    steering_value = int((x_axis + 1) * 127)  # Scale from 0 to 255
+
+    # Create a message to send to Arduino
+    message = f"{accel_value},{brake_value},{steering_value}\n"
+
+    # Debugging: Print message before sending
+    print(f"🎮 Message to Arduino: {message.strip()}")
+
+    # Ensure the serial connection is open before sending
+    if arduino.is_open:
+        try:
+            arduino.write(message.encode())
+            print(f"✅ Sent to Arduino: {message.strip()}")
+        except serial.SerialException as e:
+            print(f"❌ Error in writing to Arduino: {e}")
+    else:
+        print("❌ Serial connection not open. Please check the connection.")
+
+    # Delay to prevent sending data too fast
+    pygame.time.delay(100)  # 100ms delay
